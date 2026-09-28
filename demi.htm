@@ -1,0 +1,314 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Hi-Tech Admin Dashboard</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.1/dist/css/bootstrap.min.css">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+<style>
+body { background:#f4f6f9; }
+.sidebar { background:#1f2937; min-height:100vh; color:#fff; }
+.sidebar a { color:#fff; text-decoration:none; display:block; padding:12px; }
+.sidebar a:hover { background:#111827; }
+.content { padding:20px; }
+.card { margin-bottom:20px; }
+.stock-in { color:green; font-weight:bold; }
+.stock-out { color:red; font-weight:bold; }
+</style>
+</head>
+<body>
+
+<div class="d-flex">
+  <!-- Sidebar -->
+  <div class="sidebar p-3">
+    <h3 class="text-center mb-4">BKV INDUSTRIES <br> DASHBOARD</h3>
+    <a href="#" onclick="showSection('blogs')"><i class="fa fa-newspaper"></i> Blogs</a>
+    <a href="#" onclick="showSection('products')"><i class="fa fa-box"></i> Products</a>
+    <a href="#" onclick="showSection('purchases')"><i class="fa fa-cart-shopping"></i> Purchases</a>
+    <a href="#" onclick="logout()"><i class="fa fa-sign-out-alt"></i> Logout</a>
+  </div>
+
+  <!-- Content -->
+  <div class="content flex-fill">
+
+    <!-- Blogs -->
+    <div id="blogs" class="dashboard-section">
+      <h4>Manage Blogs</h4>
+      <form id="blogForm" class="mb-3">
+        <input type="text" id="blogTitle" class="form-control mb-2" placeholder="Title" required>
+        <input type="text" id="blogAuthor" class="form-control mb-2" placeholder="Author" required>
+        <input type="date" id="blogDate" class="form-control mb-2" required>
+        <input type="text" id="blogCategory" class="form-control mb-2" placeholder="Category">
+        <input type="text" id="blogImage" class="form-control mb-2" placeholder="Image URL">
+        <textarea id="blogContent" class="form-control mb-2" placeholder="Content"></textarea>
+        <input type="hidden" id="blogId">
+        <button type="submit" class="btn btn-primary w-100">Add / Update Blog</button>
+      </form>
+      <div id="blogsList"></div>
+    </div>
+
+    <!-- Products -->
+    <div id="products" class="dashboard-section" style="display:none;">
+      <h4>Manage Products</h4>
+      <form id="productForm" class="mb-3">
+
+        <input type="text" id="pTitle" class="form-control mb-2" placeholder="Product Title" required>
+        <input type="number" id="pPrice" class="form-control mb-2" placeholder="Price" required>
+        <input type="text" id="pBrand" class="form-control mb-2" placeholder="Brand" required>
+        <textarea id="pDesc" class="form-control mb-2" placeholder="Description"></textarea>
+        <textarea id="pNotes" class="form-control mb-2" placeholder="Notes"></textarea>
+
+        <!-- Cloudinary File Upload -->
+        <input type="file" id="pImgFile" accept="image/*" class="form-control mb-2" required>
+        <input type="hidden" id="pImg"> <!-- stores Cloudinary URL -->
+        <img id="pImgPreview" src="" style="max-width:150px; margin-top:5px; display:none;">
+
+        <input type="text" id="pMaterial" class="form-control mb-2" placeholder="Material">
+        <select id="pStock" class="form-control mb-2">
+          <option value="in-stock">In Stock</option>
+          <option value="out-of-stock">Out of Stock</option>
+        </select>
+        <input type="hidden" id="productId">
+        <button type="submit" class="btn btn-success w-100">Add / Update Product</button>
+      </form>
+      <div id="productsList"></div>
+    </div>
+
+    <!-- Purchases -->
+    <div id="purchases" class="dashboard-section" style="display:none;">
+      <h4>Purchase Orders</h4>
+      <table class="table table-bordered">
+        <thead>
+          <tr>
+            <th>Product</th>
+            <th>Name</th>
+            <th>Mobile</th>
+            <th>Email</th>
+            <th>Time</th>
+          </tr>
+        </thead>
+        <tbody id="purchasesList"></tbody>
+      </table>
+    </div>
+
+  </div>
+</div>
+
+<!-- Firebase -->
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+
+<script>
+const firebaseConfig = {
+  apiKey: "AIzaSyCFVGb493Yqvu5t_aOYGcIa7u3Q9e0J884",
+  authDomain: "high-tech-products.firebaseapp.com",
+  projectId: "high-tech-products",
+  storageBucket: "high-tech-products.appspot.com",
+  messagingSenderId: "356225221226",
+  appId: "1:356225221226:web:cd953ba67db834919b4013"
+};
+firebase.initializeApp(firebaseConfig);
+const auth = firebase.auth();
+const db = firebase.firestore();
+
+// Auth check
+auth.onAuthStateChanged(user => {
+  if(!user) window.location.href='admin-login.html';
+});
+
+// Sidebar switch
+function showSection(section){
+  document.querySelectorAll('.dashboard-section').forEach(s=>s.style.display='none');
+  document.getElementById(section).style.display='block';
+}
+
+// Logout
+function logout(){ auth.signOut(); }
+
+// Blogs
+document.getElementById('blogForm').addEventListener('submit', async e=>{
+  e.preventDefault();
+  const id = document.getElementById('blogId').value;
+  const data = {
+    title: document.getElementById('blogTitle').value,
+    author: document.getElementById('blogAuthor').value,
+    date: document.getElementById('blogDate').value,
+    category: document.getElementById('blogCategory').value,
+    image: document.getElementById('blogImage').value,
+    content: document.getElementById('blogContent').value
+  };
+  if(id) await db.collection('blogs').doc(id).update(data);
+  else await db.collection('blogs').add(data);
+  document.getElementById('blogForm').reset(); document.getElementById('blogId').value='';
+  fetchBlogs();
+});
+
+async function fetchBlogs(){
+  const snap = await db.collection('blogs').orderBy('date','desc').get();
+  const container = document.getElementById('blogsList'); container.innerHTML='';
+  snap.forEach(doc=>{
+    const b = doc.data(); b.id=doc.id;
+    container.innerHTML+=`<div class="card p-2 mb-2">
+      <strong>${b.title}</strong> by ${b.author} <span class="text-muted">(${b.date})</span>
+      <div class="mt-2">
+        <button class="btn btn-sm btn-primary" onclick="editBlog('${b.id}')">Edit</button>
+        <button class="btn btn-sm btn-danger" onclick="deleteBlog('${b.id}')">Delete</button>
+      </div>
+    </div>`;
+  });
+}
+window.addEventListener('load', fetchBlogs);
+async function editBlog(id){
+  const doc = await db.collection('blogs').doc(id).get();
+  const b = doc.data();
+  document.getElementById('blogTitle').value = b.title;
+  document.getElementById('blogAuthor').value = b.author;
+  document.getElementById('blogDate').value = b.date;
+  document.getElementById('blogCategory').value = b.category;
+  document.getElementById('blogImage').value = b.image;
+  document.getElementById('blogContent').value = b.content;
+  document.getElementById('blogId').value = id;
+}
+async function deleteBlog(id){
+  if(confirm('Delete this blog?')){ await db.collection('blogs').doc(id).delete(); fetchBlogs(); }
+}
+
+// Cloudinary Upload
+const cloudName = "dnjxi0zur"; // Replace with your Cloudinary cloud name
+const uploadPreset = "spareasset"; // Replace with your unsigned preset
+
+document.getElementById('pImgFile').addEventListener('change', async (e) => {
+  const file = e.target.files[0];
+  if (!file) return;
+
+  const formData = new FormData();
+  formData.append('file', file);
+  formData.append('upload_preset', uploadPreset);
+
+  try {
+    const res = await fetch(`https://api.cloudinary.com/v1_1/${cloudName}/image/upload`, {
+      method: 'POST',
+      body: formData
+    });
+    const data = await res.json();
+
+    // Store Cloudinary URL in hidden input
+    document.getElementById('pImg').value = data.secure_url;
+
+    // Show preview
+    const preview = document.getElementById('pImgPreview');
+    preview.src = data.secure_url;
+    preview.style.display = 'block';
+
+  } catch (err) {
+    console.error("Cloudinary upload failed", err);
+    alert("Image upload failed. Try again.");
+  }
+});
+
+// Products
+document.getElementById("productForm").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const id = document.getElementById("productId").value;
+  const title = document.getElementById("pTitle").value;
+  const price = document.getElementById("pPrice").value;
+  const brand = document.getElementById("pBrand").value;
+  const desc = document.getElementById("pDesc").value;
+  const notes = document.getElementById("pNotes").value;
+  const imgUrl = document.getElementById("pImg").value;
+  const material = document.getElementById("pMaterial").value;
+  const stockStatus = document.getElementById("pStock").value;
+
+  if(!imgUrl || !brand) return alert("Brand and Image are required");
+  const productData = {
+    title,
+    price:"₹"+price,
+    brand,
+    desc,
+    notes,
+    img:imgUrl,
+    material,
+    stockStatus,
+    features:["High Performance","Premium Design","Advanced Technology"]
+  };
+
+  if(id) await db.collection("products").doc(id).update(productData);
+  else await db.collection("products").add(productData);
+
+  document.getElementById("productForm").reset(); 
+  document.getElementById("productId").value='';
+  document.getElementById("pImgPreview").style.display='none';
+  fetchProducts();
+});
+
+async function fetchProducts(){
+  const snap = await db.collection("products").get();
+  const container = document.getElementById("productsList"); 
+  container.innerHTML='';
+
+  snap.forEach(doc=>{
+    const p = doc.data(); p.id=doc.id;
+    const stockClass = p.stockStatus==='in-stock'?'stock-in':'stock-out';
+
+    container.innerHTML+=`
+      <div class="card p-2 mb-2">
+        <img src="${p.img}" alt="${p.title}" style="max-width:100px; display:block; margin-bottom:5px;">
+        <strong>${p.title}</strong> - ${p.price} - <span class="${stockClass}">${p.stockStatus}</span>
+        <br><small>Brand: ${p.brand}</small>
+        <div class="mt-2">
+          <button class="btn btn-sm btn-primary" onclick="editProduct('${p.id}')">Edit</button>
+          <button class="btn btn-sm btn-danger" onclick="deleteProduct('${p.id}')">Delete</button>
+        </div>
+      </div>`;
+  });
+}
+
+async function editProduct(id){
+  const doc = await db.collection("products").doc(id).get();
+  const p = doc.data();
+
+  document.getElementById("pTitle").value = p.title;
+  document.getElementById("pPrice").value = p.price.replace("₹","");
+  document.getElementById("pBrand").value = p.brand;
+  document.getElementById("pDesc").value = p.desc;
+  document.getElementById("pNotes").value = p.notes;
+
+  document.getElementById("pImg").value = p.img;
+  const preview = document.getElementById("pImgPreview");
+  preview.src = p.img;
+  preview.style.display = 'block';
+
+  document.getElementById("pMaterial").value = p.material;
+  document.getElementById("pStock").value = p.stockStatus;
+  document.getElementById("productId").value=id;
+}
+
+async function deleteProduct(id){
+  if(confirm("Delete this product?")){ 
+    await db.collection("products").doc(id).delete(); 
+    fetchProducts(); 
+  }
+}
+
+// Purchases
+async function fetchPurchases(){
+  const snap = await db.collection("purchases").orderBy('timestamp','desc').get();
+  const tbody = document.getElementById("purchasesList"); tbody.innerHTML='';
+  snap.forEach(doc=>{
+    const p = doc.data();
+    tbody.innerHTML+=`<tr>
+      <td>${p.productID}</td>
+      <td>${p.name}</td>
+      <td>${p.mobile}</td>
+      <td>${p.userEmail}</td>
+      <td>${p.timestamp ? p.timestamp.toDate() : ''}</td>
+    </tr>`;
+  });
+}
+
+window.addEventListener('load', ()=>{fetchProducts(); fetchPurchases();});
+</script>
+</body>
+</html>
